@@ -17,7 +17,8 @@ def download_windows_multiprocess(starttime: UTCDateTime, endtime: UTCDateTime, 
     n_processes : number of parallel processes that will be used to download the data 
     according to iris.edu the connections should be limited to 5 (http://ds.iris.edu/ds/nodes/dmc/services/usage/)
     """
-    windows = np.arange(starttime, endtime, duration)
+    windows = np.arange(starttime, endtime + duration,
+                        duration)  # do not exclude the last window
     total_windows = len(windows)
 
     process_start = datetime.now()
@@ -50,7 +51,7 @@ def download_windows_multiprocess(starttime: UTCDateTime, endtime: UTCDateTime, 
     return
 
 
-def download_windows(starttime, endtime, duration=60*60*1, path='data'):
+def download_windows(starttime: UTCDateTime, endtime: UTCDateTime, duration=60*60*1, path='data'):
     windows = np.arange(starttime, endtime, duration)
     total_windows = len(windows)
     elapseds = []
@@ -65,12 +66,13 @@ def download_windows(starttime, endtime, duration=60*60*1, path='data'):
         downloaded = download_window(
             windows[k], windows[k] + duration, path=path)
         end = timer()
-        elapsed = end - start
-        elapseds.append(elapsed)
-        process_end_estimate = process_start + \
-            timedelta(0, np.average(elapseds) * total_windows)
 
         if downloaded:
+            elapsed = end - start
+            elapseds.append(elapsed)
+            time_left_estimate = np.average(
+                elapseds[-10:]) * (total_windows - k)  # in s
+            process_end_estimate = datetime.now() + timedelta(0, time_left_estimate)
             print(
                 f'\nWindow : {windows[k].strftime("%d/%m/%Y, %H:%M:%S")}\nDownloading time : {elapsed}\nEstimated total : {process_end_estimate.strftime("%d/%m/%Y, %H:%M:%S")}')
 
@@ -83,8 +85,8 @@ def download_windows(starttime, endtime, duration=60*60*1, path='data'):
     return
 
 
-def download_window(starttime, endtime, skip=True, path='data'):
-    filename = f'{starttime.strftime("%Y_%m_%d_%H_%M_%S")}.mseed'
+def download_window(starttime: UTCDateTime, endtime: UTCDateTime, skip=True, path='data', filename="%Y_%m_%d_%H_%M_%S"):
+    filename = f'{starttime.strftime(filename)}.mseed'
     file = os.path.join(path, filename)
 
     if skip and os.path.isfile(file):
