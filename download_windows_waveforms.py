@@ -12,8 +12,7 @@ client = Client("IRIS")
 
 def download_windows_multiprocess(starttime: UTCDateTime, endtime: UTCDateTime, duration=60*60*1, path='data', n_processes=5):
     """
-    duration : in seconds
-    starttime : UTCDateTime of the beggining of 
+    duration : of each window in seconds
     n_processes : number of parallel processes that will be used to download the data 
     according to iris.edu the connections should be limited to 5 (http://ds.iris.edu/ds/nodes/dmc/services/usage/)
     """
@@ -31,7 +30,7 @@ def download_windows_multiprocess(starttime: UTCDateTime, endtime: UTCDateTime, 
 
         i1 = k*window_process_size
         if k == n_processes - 1:
-            i2 = -1
+            i2 = total_windows - 1
         else:
             i2 = (k+1)*window_process_size
 
