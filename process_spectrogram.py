@@ -120,16 +120,16 @@ def process_file(file, path, inventory, out_path='spectrograms'):
 
     # High frenquencies
     f, t, Sxx = spectrogram(T, wlen=10, per_lap=.8, fact_nfft=10)
-    f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=2, fmax=9)
-    vmin, vmax = percentile(Sxx, keep=98)
+    f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=.9, fmax=9)
+    vmin, vmax = percentile(Sxx, keep=90)
 
     plot_image(f, t, Sxx, filename=filename,
                path=os.path.join(out_path, 'HF'), vmin=vmin, vmax=vmax)
 
     # Middle frenquencies
     f, t, Sxx = spectrogram(T, wlen=50, per_lap=.8, fact_nfft=10)
-    f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=.05, fmax=2)
-    vmin, vmax = percentile(Sxx, keep=98)
+    f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=.05, fmax=1)
+    vmin, vmax = percentile(Sxx, keep=94)
 
     plot_image(f, t, Sxx, filename=filename,
                path=os.path.join(out_path, 'MF'), vmin=vmin, vmax=vmax, logy=True)
@@ -137,7 +137,7 @@ def process_file(file, path, inventory, out_path='spectrograms'):
     # Low frenquencies
     f, t, Sxx = spectrogram(T, wlen=100, per_lap=.8, fact_nfft=10)
     f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=.01, fmax=.1)
-    vmin, vmax = percentile(Sxx, keep=98)
+    vmin, vmax = percentile(Sxx, keep=96)
 
     plot_image(f, t, Sxx, filename=filename,
                path=os.path.join(out_path, 'LF'), vmin=vmin, vmax=vmax)
