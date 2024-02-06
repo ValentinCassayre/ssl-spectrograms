@@ -20,7 +20,10 @@ def preprocess_waveform(T, inventory, pre_filt=(0.005, 0.006, 30.0, 35.0)):
 
 
 def normalize(data):
-    return (data - np.mean(data))/np.std(data)
+    # return data/np.max(np.abs(data)) # Divide by the maximum
+    # return (data - np.mean(data))/(np.max(data) - np.min(data)) # Mean normalization
+
+    return (data - np.mean(data))/np.std(data) # Z-score
 
 
 def spectrogram(data, sampling_rate, wlen, per_lap, fact_nfft):
@@ -49,8 +52,8 @@ def process_spectrogram(f, t, Sxx, fmin=None, fmax=None):
 
 
 def percentile(Sxx, keep=(96, 96)):
-    vmin = np.percentile(Sxx, (100 - keep)/2)
-    vmax = np.percentile(Sxx, (100 + keep)/2)
+    vmin = np.percentile(Sxx, (100 - keep[0])/2)
+    vmax = np.percentile(Sxx, (100 + keep[1])/2)
 
     return vmin, vmax
 
@@ -120,27 +123,9 @@ def process_file(file, path, inventory, out_path='spectrograms'):
 
     filename = f'{Tcopy.stats.starttime.strftime("%Y_%m_%d_%H_%M_%S")}.png'
     data = Tcopy.data
-    data = normalize(data)
+    #data = normalize(data)
 
     sampling_rate = Tcopy.stats.sampling_rate
-
-    # Bandpass
-    wlen = 80
-    per_lap = .9
-    fact_nfft = 10
-    fmin = .01
-    fmax = 9
-    vmin = -130
-    vmax = 15
-    logy = True
-    name = 'BP'
-
-    f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
-                            wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
-    f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=fmin, fmax=fmax)
-
-    plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
-               vmin=vmin, vmax=vmax, logy=logy)
 
     # Middle frenquencies
     wlen = 50
@@ -148,14 +133,15 @@ def process_file(file, path, inventory, out_path='spectrograms'):
     fact_nfft = 10
     fmin = .05
     fmax = 1
-    vmin = -80
-    vmax = 35
+    vmin = -.4
+    vmax = 2.1
     logy = True
     name = 'MF'
 
     f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
                             wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
     f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=fmin, fmax=fmax)
+    Sxx = normalize(Sxx)
 
     plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
                vmin=vmin, vmax=vmax, logy=logy)
@@ -165,20 +151,21 @@ def process_file(file, path, inventory, out_path='spectrograms'):
     per_lap = .9
     fact_nfft = 10
     fmin = .01
-    fmax = .1
-    vmin = -65
-    vmax = 15
+    fmax = .08
+    vmin = -.6
+    vmax = 2.0
     logy = False
     name = 'LF'
 
     f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
                             wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
     f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=fmin, fmax=fmax)
+    Sxx = normalize(Sxx)
 
     plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
                vmin=vmin, vmax=vmax, logy=logy)
 
-    duration = 60*60
+    duration = 10*60
     Tslices = slice_trace(T, duration)
 
     for Tslice in Tslices:
@@ -188,24 +175,25 @@ def process_file(file, path, inventory, out_path='spectrograms'):
         data = Tslice.data
         data = normalize(data)
 
-        wlen = 10
+        wlen = 5
         per_lap = .9
-        fact_nfft = 10
-        fmin = .9
-        fmax = 9
-        vmin = -140
-        vmax = -55
+        fact_nfft = 2
+        fmin = 2
+        fmax = 8
+        vmin = -1.4
+        vmax = 1
         logy = False
         name = 'HF'
 
         f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
                                 wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
         f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=fmin, fmax=fmax)
+        Sxx = normalize(Sxx)
 
         plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
                    vmin=vmin, vmax=vmax, logy=logy)
 
-     # Waveforms
+    # Waveforms
     Tcopy.filter('bandpass', freqmin=2, freqmax=9)
 
     plot_waveform(T, filename, path=os.path.join(out_path, 'waveforms'))
