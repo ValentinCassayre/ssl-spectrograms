@@ -104,6 +104,37 @@ def plot_waveform(T, filename, path='', size=(1, 1), dpi=512):
 
     return
 
+def plot_dual(f, t, Sxx, T, filename, path='', vmin=None, vmax=None, logy=False, size=(1, 1), dpi=512):
+    file = os.path.join(path, filename)
+    fig, axs = plt.subplots(2, sharex=True, sharey=False, figsize=(size[0], size[1]), dpi=dpi)
+
+    ax = axs[0]
+    ax.pcolormesh(t, f, Sxx, cmap='jet', vmin=vmin, vmax=vmax)
+    if logy:
+        ax.set_yscale('log')
+
+    ax = axs[1]
+    tt = T.times()
+    data = T.data
+    #data = data-np.mean(data)
+    data = data/np.max(np.abs(data))
+    ax.plot(tt, data, c='k', linewidth=.2)
+    ax.set_ylim(-1, 1)
+
+    plt.xlim(t[0], t[-1])
+
+    plt.subplots_adjust(0, 0, 1, 1, 0, 0)
+    for ax in axs:
+        ax.axis('off')
+        ax.margins(0, 0)
+        ax.xaxis.set_major_locator(plt.NullLocator())
+        ax.yaxis.set_major_locator(plt.NullLocator())
+    
+    plt.savefig(file, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+    return
+
 
 def slice_trace(T, duration):
     windows = np.arange(T.stats.starttime, T.stats.endtime, duration)
@@ -120,6 +151,7 @@ def process_file(file, path, inventory, out_path='spectrograms'):
     Tcopy = T.copy()
 
     preprocess_waveform(Tcopy, inventory=inventory)
+    
 
     filename = f'{Tcopy.stats.starttime.strftime("%Y_%m_%d_%H_%M_%S")}.png'
     data = Tcopy.data
@@ -146,6 +178,13 @@ def process_file(file, path, inventory, out_path='spectrograms'):
     plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
                vmin=vmin, vmax=vmax, logy=logy)
 
+    name = 'MF_LF'
+    Tfilter = Tcopy.copy()
+    Tfilter.filter('bandpass', freqmin=.01, freqmax=.08)
+
+    plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
+            vmin=vmin, vmax=vmax, logy=logy)
+
     # Low frenquencies
     wlen = 100
     per_lap = .9
@@ -165,6 +204,13 @@ def process_file(file, path, inventory, out_path='spectrograms'):
     plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
                vmin=vmin, vmax=vmax, logy=logy)
 
+    name = 'LF_HF'
+    Tfilter = Tcopy.copy()
+    Tfilter.filter('bandpass', freqmin=2, freqmax=8)
+
+    plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
+            vmin=vmin, vmax=vmax, logy=logy)
+
     duration = 10*60
     Tslices = slice_trace(T, duration)
 
@@ -173,15 +219,15 @@ def process_file(file, path, inventory, out_path='spectrograms'):
         preprocess_waveform(Tslice, inventory=inventory)
 
         data = Tslice.data
-        data = normalize(data)
+        # data = normalize(data)
 
-        wlen = 5
+        wlen = 10
         per_lap = .9
-        fact_nfft = 2
+        fact_nfft = 10
         fmin = 2
         fmax = 8
-        vmin = -1.4
-        vmax = 1
+        vmin = -1.0
+        vmax = 2.6
         logy = False
         name = 'HF'
 
@@ -192,11 +238,13 @@ def process_file(file, path, inventory, out_path='spectrograms'):
 
         plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
                    vmin=vmin, vmax=vmax, logy=logy)
+        
+        name = 'HF_MF'
+        Tfilter = Tcopy.copy()
+        Tfilter.filter('bandpass', freqmin=.05, freqmax=1)
 
-    # Waveforms
-    Tcopy.filter('bandpass', freqmin=2, freqmax=9)
-
-    plot_waveform(T, filename, path=os.path.join(out_path, 'waveforms'))
+        plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
+                vmin=vmin, vmax=vmax, logy=logy)
 
     t2 = timer()
     print(f'{filename} t={t2-t1}')
