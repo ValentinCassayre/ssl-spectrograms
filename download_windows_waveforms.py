@@ -10,6 +10,17 @@ from obspy.clients.fdsn import Client
 client = Client("IRIS")
 
 
+def download_inventory(inventory_filename="inventory.xml", inventory_path="metadata"):
+    inventory = client.get_stations(
+        network="G", station="DRV", channel="*", level="response"
+    )
+    inventory.write(
+        os.path.join(inventory_path, inventory_filename), format="STATIONXML"
+    )
+
+    return inventory
+
+
 def download_window(
     starttime: UTCDateTime,
     endtime: UTCDateTime,
@@ -44,9 +55,6 @@ def download_windows_from_list(windows, duration=60 * 60 * 1, path="data"):
     elapseds = []
     failed = 0
     process_start = datetime.now()
-    print(
-        f'starttime={starttime.strftime("%d/%m/%Y, %H:%M:%S")} endtime={endtime.strftime("%d/%m/%Y, %H:%M:%S")} process_start={process_start.strftime("%d/%m/%Y, %H:%M:%S")} {total_windows=}'
-    )
 
     for k in range(total_windows):
 
@@ -69,9 +77,6 @@ def download_windows_from_list(windows, duration=60 * 60 * 1, path="data"):
             failed += 1
 
     process_end = datetime.now()
-    print(
-        f'starttime={starttime.strftime("%d/%m/%Y, %H:%M:%S")} endtime={endtime.strftime("%d/%m/%Y, %H:%M:%S")} process_end={process_end.strftime("%d/%m/%Y, %H:%M:%S")} {total_windows=} {failed=}'
-    )
 
     return
 
@@ -141,16 +146,3 @@ def download_windows_multiprocess(
         process.join()
 
     return
-
-
-if __name__ == "__main__":
-    starttime = UTCDateTime(2000, 1, 1, 0, 0, 0)
-    endtime = UTCDateTime(2024, 1, 1, 0, 0, 0)
-
-    # # Single process
-    # download_windows(starttime, endtime, duration=60*60*1, path='data')
-
-    # Multiprocessing
-    download_windows_multiprocess(
-        starttime, endtime, duration=60 * 60 * 1, path="data", n_processes=5
-    )
