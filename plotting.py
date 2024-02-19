@@ -1,15 +1,31 @@
 import os
 
 import numpy as np
+import matplotlib
+from matplotlib import cm
 import matplotlib.pyplot as plt
 
 
-def plot_image(f, t, Sxx, filename, path='', vmin=None, vmax=None, logy=False, size=(1, 1), dpi=512):
+first = cm.get_cmap('jet', 85)
+second = cm.get_cmap('jet', 60)
+third = cm.get_cmap('jet', 85)
+forth = cm.get_cmap('Reds_r', 26)
+
+colors = np.vstack((first(np.linspace(0, 0.25, 85)),
+                       second(np.linspace(0.25, 0.75, 60)),
+                       third(np.linspace(0.75, 1, 85)),
+                       forth(np.linspace(0, 1, 26))))
+
+cmaps = {'jet-w-reduced' : matplotlib.colors.ListedColormap(colors, name='saturation_3'),
+         'wbrg' : matplotlib.colors.LinearSegmentedColormap.from_list("", ["white","powderblue","lightblue","lightskyblue","lightskyblue","yellow","orangered","red","darkred","mistyrose"])}
+cmap = cmaps['jet-w-reduced']
+
+def plot_image(f, t, Sxx, filename, path='', vmin=None, vmax=None, logy=False, cmap=cmap, size=(1, 1), dpi=256):
     file = os.path.join(path, filename)
 
     fig = plt.figure(figsize=(size[0], size[1]), dpi=dpi)
 
-    plt.pcolormesh(t, f, Sxx, cmap='jet', vmin=vmin, vmax=vmax)
+    plt.pcolormesh(t, f, Sxx, cmap=cmap, vmin=vmin, vmax=vmax)
     if logy:
         plt.yscale('log')
 
@@ -26,7 +42,7 @@ def plot_image(f, t, Sxx, filename, path='', vmin=None, vmax=None, logy=False, s
     return
 
 
-def plot_waveform(T, filename, path='', size=(1, 1), dpi=512):
+def plot_waveform(T, filename, path='', size=(1, 1), dpi=256):
     t = T.times()
     data = T.data
     file = os.path.join(path, filename)
@@ -50,12 +66,12 @@ def plot_waveform(T, filename, path='', size=(1, 1), dpi=512):
 
     return
 
-def plot_dual(f, t, Sxx, T, filename, path='', vmin=None, vmax=None, logy=False, size=(1, 1), dpi=512):
+def plot_dual(f, t, Sxx, T, filename, path='', vmin=None, vmax=None, logy=False, cmap=cmap, size=(1, 1), dpi=256):
     file = os.path.join(path, filename)
     fig, axs = plt.subplots(2, sharex=True, sharey=False, figsize=(size[0], size[1]), dpi=dpi)
 
     ax = axs[0]
-    ax.pcolormesh(t, f, Sxx, cmap='jet', vmin=vmin, vmax=vmax)
+    ax.pcolormesh(t, f, Sxx, cmap=cmap, vmin=vmin, vmax=vmax)
     if logy:
         ax.set_yscale('log')
 
