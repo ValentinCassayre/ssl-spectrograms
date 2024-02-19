@@ -7,7 +7,7 @@ import scipy.signal
 
 from obspy import read, read_inventory
 
-from plotting import plot_image, plot_waveform, plot_dual
+from plotting import cmaps, plot_image, plot_waveform, plot_dual
 
 
 def read_inventory_xml(inventory_filename='inventory.xml', inventory_path='metadata'):
@@ -42,7 +42,7 @@ def spectrogram(data, sampling_rate, wlen, per_lap, fact_nfft):
     return f, t, Sxx
 
 
-def process_spectrogram(f, t, Sxx, fmin=None, fmax=None):
+def process_spectrogram(f, t, Sxx, Wn=.05, fmin=None, fmax=None):
     if fmin is None:
         fmin = f[0]
     if fmax is None:
@@ -53,12 +53,15 @@ def process_spectrogram(f, t, Sxx, fmin=None, fmax=None):
     Sxx_filter = Sxx[ii]
     Sxx_db = np.log(Sxx_filter)*10
 
-    return f[ii], t, Sxx_db
+    b, a = scipy.signal.butter(4, Wn)
+    Sxx_smooth = scipy.signal.filtfilt(b, a, Sxx_db, padlen=10)
+
+    return f[ii], t, Sxx_smooth
 
 
-def percentile(Sxx, keep=(96, 96)):
-    vmin = np.percentile(Sxx, (100 - keep[0])/2)
-    vmax = np.percentile(Sxx, (100 + keep[1])/2)
+def percentile(Sxx, p1=100, p2=100):
+    vmin = np.percentile(Sxx, (100 - p1))
+    vmax = np.percentile(Sxx, p2)
 
     return vmin, vmax
 
@@ -75,70 +78,22 @@ def process_file(file, path, inventory, out_path='spectrograms'):
 
     st = read(os.path.join(path, file))
     T = st.select(component='Z')[0]
-    Tcopy = T.copy()
-
-    preprocess_waveform(Tcopy, inventory=inventory)
-    
-
-    filename = f'{Tcopy.stats.starttime.strftime("%Y_%m_%d_%H_%M_%S")}.png'
-    data = Tcopy.data
-    #data = normalize(data)
-
-    sampling_rate = Tcopy.stats.sampling_rate
+    sampling_rate = T.stats.sampling_rate
 
     # Middle frenquencies
+    duration = 60*60
     wlen = 50
     per_lap = .9
     fact_nfft = 10
     fmin = .05
-    fmax = 1
-    vmin = -.4
-    vmax = 2.1
+    fmax = .9
+    p1 = 60
+    p2 = 98
     logy = True
+    Wn = .05
+    cmap = cmaps['jet-w-reduced']
     name = 'MF'
 
-    f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
-                            wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
-    f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=fmin, fmax=fmax)
-    Sxx = normalize(Sxx)
-
-    plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
-               vmin=vmin, vmax=vmax, logy=logy)
-
-    name = 'MF_LF'
-    Tfilter = Tcopy.copy()
-    Tfilter.filter('bandpass', freqmin=.01, freqmax=.08)
-
-    plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
-            vmin=vmin, vmax=vmax, logy=logy)
-
-    # Low frenquencies
-    wlen = 100
-    per_lap = .9
-    fact_nfft = 10
-    fmin = .01
-    fmax = .08
-    vmin = -.6
-    vmax = 2.0
-    logy = False
-    name = 'LF'
-
-    f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
-                            wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
-    f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=fmin, fmax=fmax)
-    Sxx = normalize(Sxx)
-
-    plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
-               vmin=vmin, vmax=vmax, logy=logy)
-
-    name = 'LF_HF'
-    Tfilter = Tcopy.copy()
-    Tfilter.filter('bandpass', freqmin=2, freqmax=8)
-
-    plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
-            vmin=vmin, vmax=vmax, logy=logy)
-
-    duration = 10*60
     Tslices = slice_trace(T, duration)
 
     for Tslice in Tslices:
@@ -146,32 +101,86 @@ def process_file(file, path, inventory, out_path='spectrograms'):
         preprocess_waveform(Tslice, inventory=inventory)
 
         data = Tslice.data
-        # data = normalize(data)
-
-        wlen = 10
-        per_lap = .9
-        fact_nfft = 10
-        fmin = 2
-        fmax = 8
-        vmin = -1.0
-        vmax = 2.6
-        logy = False
-        name = 'HF'
 
         f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
                                 wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
-        f, t, Sxx = process_spectrogram(f, t, Sxx, fmin=fmin, fmax=fmax)
+        f, t, Sxx = process_spectrogram(f, t, Sxx, Wn=Wn, fmin=fmin, fmax=fmax)
         Sxx = normalize(Sxx)
+        vmin, vmax = percentile(Sxx, p1=p1, p2=p2)
 
-        plot_image(f, t, Sxx, filename=filename, path=os.path.join(out_path, name),
-                   vmin=vmin, vmax=vmax, logy=logy)
-        
-        name = 'HF_MF'
-        Tfilter = Tcopy.copy()
-        Tfilter.filter('bandpass', freqmin=.05, freqmax=1)
+        Tfilter = Tslice.copy()
+        Tfilter.filter('bandpass', freqmin=fmin, freqmax=fmax)
 
         plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
-                vmin=vmin, vmax=vmax, logy=logy)
+                vmin=vmin, vmax=vmax, logy=logy, cmap=cmap)
+
+    # Low frenquencies
+    duration = 60*60
+    wlen = 100
+    per_lap = .9
+    fact_nfft = 10
+    fmin = .01
+    fmax = .08
+    p1 = 70
+    p2 = 99
+    logy = False
+    Wn = .07
+    cmap = cmaps['jet-w-reduced']
+    name = 'LF'
+
+    Tslices = slice_trace(T, duration)
+
+    for Tslice in Tslices:
+        filename = f'{Tslice.stats.starttime.strftime("%Y_%m_%d_%H_%M_%S")}.png'
+        preprocess_waveform(Tslice, inventory=inventory)
+
+        data = Tslice.data
+
+        f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
+                                wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
+        f, t, Sxx = process_spectrogram(f, t, Sxx, Wn=Wn, fmin=fmin, fmax=fmax)
+        Sxx = normalize(Sxx)
+        vmin, vmax = percentile(Sxx, p1=p1, p2=p2)
+
+        Tfilter = Tslice.copy()
+        Tfilter.filter('bandpass', freqmin=fmin, freqmax=fmax)
+
+        plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
+                vmin=vmin, vmax=vmax, logy=logy, cmap=cmap)
+
+    # High frequencies
+    duration = 10*60
+    wlen = 10
+    per_lap = .9
+    fact_nfft = 10
+    fmin = 2
+    fmax = 8
+    p1 = 80
+    p2 = 95
+    logy = False
+    Wn = .03
+    cmap = cmaps['jet-w-reduced']
+    name = 'HF'
+
+    Tslices = slice_trace(T, duration)
+
+    for Tslice in Tslices:
+        filename = f'{Tslice.stats.starttime.strftime("%Y_%m_%d_%H_%M_%S")}.png'
+        preprocess_waveform(Tslice, inventory=inventory)
+
+        data = Tslice.data
+
+        f, t, Sxx = spectrogram(data, sampling_rate=sampling_rate,
+                                wlen=wlen, per_lap=per_lap, fact_nfft=fact_nfft)
+        f, t, Sxx = process_spectrogram(f, t, Sxx, Wn=Wn, fmin=fmin, fmax=fmax)
+        Sxx = normalize(Sxx)
+        vmin, vmax = percentile(Sxx, p1=p1, p2=p2)
+
+        Tfilter = Tslice.copy()
+        Tfilter.filter('bandpass', freqmin=fmin, freqmax=fmax)
+
+        plot_dual(f, t, Sxx, Tfilter, filename=filename, path=os.path.join(out_path, name),
+                vmin=vmin, vmax=vmax, logy=logy, cmap=cmap)
 
     t2 = timer()
     print(f'{filename} t={t2-t1}')
